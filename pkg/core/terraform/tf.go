@@ -88,13 +88,22 @@ func (tf Terraform) Apply(params []string, plan *string, envs map[string]string)
 	if err != nil {
 		return "", "", err
 	}
-
+	
 	if strings.TrimSpace(workspace) != tf.Workspace {
-		_, _, _, err = tf.runTerraformCommand("workspace", envs, "new", tf.Workspace)
+		_, stderr, _, err := tf.runTerraformCommand("workspace", envs, "select", tf.Workspace)
+
 		if err != nil {
-			return "", "", err
-		}
+			if strings.Contains(stderr, "doesn't exist") {
+				_, _, _, err := tf.runTerraformCommand("workspace", envs, "new", tf.Workspace)
+				if err != nil {
+					return "", "", err
+				}
+			} else {
+				return "", "", err
+			}
+		} 
 	}
+	
 	params = append(append(append(params, "-input=false"), "-no-color"), "-auto-approve")
 	if plan != nil {
 		params = append(params, *plan)
@@ -172,7 +181,7 @@ func (tf Terraform) Plan(params []string, envs map[string]string) (bool, string,
 			}
 		} 
 	}
-	
+
 	params = append(append(params, "-input=false"), "-no-color")
 	stdout, stderr, statusCode, err := tf.runTerraformCommand("plan", envs, params...)
 	if err != nil {
